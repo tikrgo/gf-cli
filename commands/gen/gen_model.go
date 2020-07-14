@@ -120,7 +120,7 @@ import (
 	"github.com/gogf/gf/database/gdb"
 )`)
 	}
-	packageName := gstr.SnakeCase(variable)
+	packageName := SnakeCase(variable)
 	fileName := gstr.Trim(packageName, "-_.")
 	if len(fileName) > 5 && fileName[len(fileName)-5:] == "_test" {
 		// Add suffix to avoid the table name which contains "_test",
@@ -138,7 +138,7 @@ import (
 			"{TplPackageImports}": packageImports,
 			"{TplStructDefine}":   structDefine,
 		})
-		if err := gfile.PutContents(path, strings.TrimSpace(indexContent)); err != nil {
+		if err := gfile.PutContents(path, TrimSpace(indexContent)); err != nil {
 			mlog.Fatalf("writing content to '%s' failed: %v", path, err)
 		} else {
 			mlog.Print("generated:", path)
@@ -154,7 +154,7 @@ import (
 		"{TplPackageImports}": packageImports,
 		"{TplStructDefine}":   structDefine,
 	})
-	if err := gfile.PutContents(path, strings.TrimSpace(entityContent)); err != nil {
+	if err := gfile.PutContents(path, TrimSpace(entityContent)); err != nil {
 		mlog.Fatalf("writing content to '%s' failed: %v", path, err)
 	} else {
 		mlog.Print("generated:", path)
@@ -171,7 +171,7 @@ import (
 		"{TplColumnDefine}":   gstr.Trim(generateColumnDefinition(fieldMap)),
 		"{TplColumnNames}":    gstr.Trim(generateColumnNames(fieldMap)),
 	})
-	if err := gfile.PutContents(path, strings.TrimSpace(modelContent)); err != nil {
+	if err := gfile.PutContents(path, TrimSpace(modelContent)); err != nil {
 		mlog.Fatalf("writing content to '%s' failed: %v", path, err)
 	} else {
 		mlog.Print("generated:", path)
@@ -255,7 +255,8 @@ func generateStructField(field *gdb.TableField) []string {
 		}
 	}
 	ormTag = field.Name
-	jsonTag = gstr.SnakeCase(field.Name)
+	jsonTag = SnakeCase(field.Name)
+
 	if gstr.ContainsI(field.Key, "pri") {
 		ormTag += ",primary"
 	}
@@ -330,4 +331,50 @@ func generateColumnNames(fieldMap map[string]*gdb.TableField) string {
 	buffer.Reset()
 	buffer.WriteString(namesContent)
 	return buffer.String()
+}
+
+func SnakeCase(s string) string {
+	s = strings.Trim(s, " ")
+
+	del := uint8('_')
+	screaming := false
+	n := ""
+	for i, v := range s {
+		// treat acronyms as words, eg for JSONData -> JSON is a whole word
+		nextCaseIsChanged := false
+		if i+1 < len(s) {
+			next := s[i+1]
+
+			if (v >= 'A' && v <= 'Z' && next >= 'a' && next <= 'z') || (v >= 'a' && v <= 'z' && next >= 'A' && next <= 'Z') {
+				nextCaseIsChanged = true
+			}
+		}
+
+		if i > 0 && n[len(n)-1] != del && nextCaseIsChanged {
+			// add underscore if next letter case type is changed
+			if v >= 'A' && v <= 'Z' {
+				n += string(del) + string(v)
+			} else if v >= 'a' && v <= 'z' {
+				n += string(v) + string(del)
+			}
+		} else if v == ' ' || v == '_' || v == '-' || v == '.' {
+			// replace spaces/underscores with delimiters
+			n += string(del)
+		} else {
+			n = n + string(v)
+		}
+	}
+
+	if screaming {
+		n = strings.ToUpper(n)
+	} else {
+		n = strings.ToLower(n)
+	}
+	return n
+}
+
+// trim lines with long space in model files
+func TrimSpace(str string) string {
+	rep, _ := gregex.Replace("[ ]+\n", []byte("\n"), []byte(str))
+	return strings.TrimSpace(string(rep))
 }
